@@ -48,26 +48,19 @@ exports.createMovie = async (req, res) => {
       });
     }
 
+    // Use temporary paths
     const videoFile = req.files.video;
     const thumbnailFile = req.files.thumbnail;
 
-    const videoPath = `movies/${Date.now()}-${videoFile.name}`;
-    const thumbnailPath = `thumbnails/${Date.now()}-${thumbnailFile.name}`;
-
-    const videoUploadPath = path.join(__dirname, '../uploads', videoPath);
-    const thumbnailUploadPath = path.join(__dirname, '../uploads', thumbnailPath);
-
-    await videoFile.mv(videoUploadPath);
-    await thumbnailFile.mv(thumbnailUploadPath);
-
+    // Store file references instead of moving files
     const newMovie = await Movie.create({
       title,
       description,
       genre: genre.split(',').map(g => g.trim()),
       releaseYear,
       duration,
-      videoUrl: `/uploads/${videoPath}`,
-      thumbnailUrl: `/uploads/${thumbnailPath}`,
+      videoUrl: videoFile.tempFilePath, // Store temp path
+      thumbnailUrl: thumbnailFile.tempFilePath, // Store temp path
       isFeatured: isFeatured === 'true'
     });
 
