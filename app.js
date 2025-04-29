@@ -6,6 +6,19 @@ const morgan = require('morgan');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
 
+const fs = require('fs');
+const path = require('path');
+
+const uploadsDir = path.join(__dirname, 'uploads');
+const moviesDir = path.join(uploadsDir, 'movies');
+const thumbnailsDir = path.join(uploadsDir, 'thumbnails');
+
+[uploadsDir, moviesDir, thumbnailsDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
