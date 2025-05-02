@@ -42,6 +42,7 @@ app.use(fileUpload({
   useTempFiles: true,
   tempFileDir: '/tmp/'
 }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Database connection
 mongoose.connect(process.env.MONGO_URI, {
