@@ -23,6 +23,7 @@ const thumbnailsDir = path.join(uploadsDir, 'thumbnails');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const movieRoutes = require('./routes/movieRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ mongoose.connect(process.env.MONGO_URI, {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/movies', movieRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
