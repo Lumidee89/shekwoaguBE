@@ -9,7 +9,7 @@ const router = express.Router();
 router.get('/', subscriptionController.getAllSubscriptions);
 
 // Get a single subscription plan
-router.get('/:id', subscriptionController.getSubscription);
+router.get('/plan/:id', subscriptionController.getSubscription);
 
 router.post('/paystack/webhook', subscriptionController.paystackWebhook);
 
@@ -17,10 +17,30 @@ router.post('/paystack/webhook', subscriptionController.paystackWebhook);
 // All routes below this line require authentication
 router.use(authController.protect);
 
+// ========== USER SUBSCRIPTION STATUS ROUTES ==========
+// Get user's subscription status (ALWAYS returns 200 with subscription or null)
+router.get('/my/status', subscriptionController.getMySubscriptionStatus);
+
+// Initialize Paystack payment
 router.post('/initialize-payment', subscriptionController.initializeSubscriptionPayment);
 
 // Verify payment
 router.get('/verify-payment/:reference', subscriptionController.verifySubscriptionPayment);
+
+// Get user's current active subscription (returns 404 if none)
+router.get('/my/current', subscriptionController.getMyCurrentSubscription);
+
+// Get user's subscription history
+router.get('/my/history', subscriptionController.getMySubscriptionHistory);
+
+// Cancel subscription
+router.patch('/my/:subscriptionId/cancel', subscriptionController.cancelSubscription);
+
+// Toggle auto-renew
+router.patch('/my/:subscriptionId/auto-renew', subscriptionController.toggleAutoRenew);
+
+// Change subscription plan (upgrade/downgrade)
+router.post('/change-plan', subscriptionController.changePlan);
 
 // ========== ADMIN-ONLY ROUTES ==========
 // All routes below this line require admin privileges
@@ -43,25 +63,6 @@ router.get('/admin/all', subscriptionController.getAllSubscriptionsAdmin);
 
 // Seed default plans
 router.post('/seed/default', subscriptionController.seedDefaultPlans);
-
-// ========== USER SUBSCRIPTION ROUTES ==========
-// Subscribe to a plan
-router.post('/subscribe', subscriptionController.subscribeToPlan);
-
-// Get user's current active subscription
-router.get('/my/current', subscriptionController.getMyCurrentSubscription);
-
-// Get user's subscription history
-router.get('/my/history', subscriptionController.getMySubscriptionHistory);
-
-// Cancel subscription
-router.patch('/my/:subscriptionId/cancel', subscriptionController.cancelSubscription);
-
-// Toggle auto-renew
-router.patch('/my/:subscriptionId/auto-renew', subscriptionController.toggleAutoRenew);
-
-// Change subscription plan (upgrade/downgrade)
-router.post('/change-plan', subscriptionController.changePlan);
 
 // ========== ADMIN USER SUBSCRIPTION ROUTES ==========
 // Get all user subscriptions

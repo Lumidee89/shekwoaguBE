@@ -138,22 +138,16 @@ exports.getMyCurrentSubscription = async (req, res) => {
       status: 'active'
     }).populate('plan');
 
-    if (!subscription) {
-      return res.status(404).json({
-        status: 'fail',
-        message: 'You do not have an active subscription'
-      });
-    }
-
+    // Return 200 with null if no subscription
     res.status(200).json({
       status: 'success',
       data: {
-        subscription
+        subscription: subscription || null
       }
     });
   } catch (err) {
-    res.status(404).json({
-      status: 'fail',
+    res.status(500).json({
+      status: 'error',
       message: err.message
     });
   }
@@ -881,6 +875,13 @@ exports.verifySubscriptionPayment = async (req, res) => {
 
       await subscription.save();
 
+      // Also update the user's subscriptionStatus field in User model
+      const User = require('../models/User');
+      await User.findByIdAndUpdate(userId, {
+        subscriptionStatus: 'active',
+        currentSubscription: subscription._id
+      });
+
       res.status(200).json({
         status: 'success',
         message: 'Payment verified successfully',
@@ -889,7 +890,7 @@ exports.verifySubscriptionPayment = async (req, res) => {
         }
       });
     } else {
-      subscription.status = 'expired';
+      subscription.status = 'failed';
       await subscription.save();
 
       res.status(400).json({
@@ -989,6 +990,7 @@ exports.getMySubscriptionStatus = async (req, res) => {
       status: 'active'
     }).populate('plan');
 
+    // Always return 200, even if no subscription
     res.status(200).json({
       status: 'success',
       data: {
@@ -997,8 +999,8 @@ exports.getMySubscriptionStatus = async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(404).json({
-      status: 'fail',
+    res.status(500).json({
+      status: 'error',
       message: err.message
     });
   }
