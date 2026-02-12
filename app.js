@@ -24,6 +24,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const movieRoutes = require('./routes/movieRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const downloadRoutes = require('./routes/downloadRoutes');
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/downloads', downloadRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
