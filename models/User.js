@@ -23,6 +23,15 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  currentSubscription: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UserSubscription'
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ['active', 'cancelled', 'expired', 'none'],
+    default: 'none'
+  },
   watchlist: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Movie'

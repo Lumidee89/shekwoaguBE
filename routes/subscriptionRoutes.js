@@ -37,4 +37,36 @@ router.get('/admin/all', subscriptionController.getAllSubscriptionsAdmin);
 // Seed default plans
 router.post('/seed/default', subscriptionController.seedDefaultPlans);
 
+// ========== USER SUBSCRIPTION ROUTES ==========
+// Subscribe to a plan
+router.post('/subscribe', subscriptionController.subscribeToPlan);
+
+// Get user's current active subscription
+router.get('/my/current', subscriptionController.getMyCurrentSubscription);
+
+// Get user's subscription history
+router.get('/my/history', subscriptionController.getMySubscriptionHistory);
+
+// Cancel subscription
+router.patch('/my/:subscriptionId/cancel', subscriptionController.cancelSubscription);
+
+// Toggle auto-renew
+router.patch('/my/:subscriptionId/auto-renew', subscriptionController.toggleAutoRenew);
+
+// Change subscription plan (upgrade/downgrade)
+router.post('/change-plan', subscriptionController.changePlan);
+
+// ========== ADMIN USER SUBSCRIPTION ROUTES ==========
+// Get all user subscriptions
+router.get('/admin/user-subscriptions', subscriptionController.getAllUserSubscriptions);
+
+// Get subscriptions by status
+router.get('/admin/status/:status', subscriptionController.getSubscriptionsByStatus);
+
+// Get user's subscriptions by user ID
+router.get('/admin/user/:userId', subscriptionController.getUserSubscriptions);
+
+// Manually expire subscription (admin only)
+router.patch('/admin/:subscriptionId/expire', subscriptionController.expireSubscription);
+
 module.exports = router;
