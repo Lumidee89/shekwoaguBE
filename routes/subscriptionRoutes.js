@@ -23,7 +23,7 @@ router.use(authController.restrictTo('admin'));
 router.post('/', subscriptionController.createSubscription);
 
 // Update a subscription plan
-router.patch('/:id', subscriptionController.updateSubscription);
+router.patch('/plan/:id', subscriptionController.updateSubscription);
 
 // Delete/deactivate a subscription plan
 router.delete('/:id', subscriptionController.deleteSubscription);
