@@ -957,30 +957,18 @@ exports.checkSubscriptionAccess = async (req, res, next) => {
 
     const activeSubscription = await UserSubscription.findOne({
       user: userId,
-      status: 'active'
+      status: 'active',
+      endDate: { $gt: new Date() }
     });
 
     if (!activeSubscription) {
       return res.status(403).json({
         status: 'fail',
-        message: 'You need an active subscription to access this content',
+        message: 'You need an active subscription to watch movies',
         requiresSubscription: true
       });
     }
 
-    // Check if subscription is expired
-    if (new Date() > activeSubscription.endDate) {
-      activeSubscription.status = 'expired';
-      await activeSubscription.save();
-      
-      return res.status(403).json({
-        status: 'fail',
-        message: 'Your subscription has expired. Please renew to continue watching.',
-        requiresSubscription: true
-      });
-    }
-
-    // Attach subscription to request for use in other routes
     req.subscription = activeSubscription;
     next();
   } catch (err) {

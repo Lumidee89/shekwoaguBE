@@ -10,9 +10,7 @@ router.get('/', movieController.getAllMovies);
 router.get('/:id', movieController.getMovie);
 
 router.use(authController.protect);
-router.use(subscriptionController.checkSubscriptionAccess); 
-
-router.get('/watch/:id', movieController.getMovie);
+router.get('/watch/:id', subscriptionController.checkSubscriptionAccess, movieController.getMovieWithVideo);
 
 // Admin-only routes
 router.use(authController.restrictTo('admin'));

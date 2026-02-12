@@ -23,10 +23,42 @@ exports.getAllMovies = async (req, res) => {
 exports.getMovie = async (req, res) => {
   try {
     const movie = await Movie.findById(req.params.id);
+    
+    if (!movie) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'No movie found with that ID'
+      });
+    }
+
+    if (req.user) {
+      const UserSubscription = require('../models/UserSubscription');
+      const activeSubscription = await UserSubscription.findOne({
+        user: req.user.id,
+        status: 'active',
+        endDate: { $gt: new Date() }
+      });
+
+      if (activeSubscription) {
+        return res.status(200).json({
+          status: 'success',
+          data: {
+            movie: {
+              ...movie.toObject(),
+              videoUrl: movie.videoUrl
+            }
+          }
+        });
+      }
+    }
+
+    const movieData = movie.toObject();
+    delete movieData.videoUrl;
+    
     res.status(200).json({
       status: 'success',
       data: {
-        movie
+        movie: movieData
       }
     });
   } catch (err) {
@@ -133,6 +165,34 @@ exports.deleteMovie = async (req, res) => {
     res.status(204).json({
       status: 'success',
       data: null
+    });
+  } catch (err) {
+    res.status(404).json({
+      status: 'fail',
+      message: err.message
+    });
+  }
+};
+
+exports.getMovieWithVideo = async (req, res) => {
+  try {
+    const movie = await Movie.findById(req.params.id);
+    
+    if (!movie) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'No movie found with that ID'
+      });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        movie: {
+          ...movie.toObject(),
+          videoUrl: movie.videoUrl
+        }
+      }
     });
   } catch (err) {
     res.status(404).json({
