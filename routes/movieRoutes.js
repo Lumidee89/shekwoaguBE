@@ -1,6 +1,7 @@
 const express = require('express');
 const movieController = require('../controllers/movieController');
 const authController = require('../controllers/authController');
+const subscriptionController = require('../controllers/subscriptionController');
 
 const router = express.Router();
 
@@ -8,8 +9,10 @@ const router = express.Router();
 router.get('/', movieController.getAllMovies);
 router.get('/:id', movieController.getMovie);
 
-// Protected routes (require authentication)
 router.use(authController.protect);
+router.use(subscriptionController.checkSubscriptionAccess); 
+
+router.get('/watch/:id', movieController.getMovie);
 
 // Admin-only routes
 router.use(authController.restrictTo('admin'));

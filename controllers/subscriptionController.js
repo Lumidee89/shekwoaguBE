@@ -1,5 +1,6 @@
 const Subscription = require('../models/Subscription');
 const UserSubscription = require('../models/UserSubscription');
+const paystackService = require('../services/paystackService');
 
 // Get all active subscription plans
 exports.getAllSubscriptions = async (req, res) => {
@@ -735,6 +736,357 @@ exports.seedDefaultPlans = async (req, res) => {
       message: `${createdPlans.length} default plans created successfully`,
       data: {
         subscriptions: createdPlans
+      }
+    });
+  } catch (err) {
+    res.status(400).json({
+      status: 'fail',
+      message: err.message
+    });
+  }
+};
+
+exports.initializeSubscriptionPayment = async (req, res) => {
+  try {
+    const { planId, billingCycle = 'monthly', autoRenew = true } = req.body;
+    const userId = req.user.id;
+    const user = req.user;
+
+    // Check if plan exists and is active
+    const plan = await Subscription.findById(planId);
+    if (!plan) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'Subscription plan not found'
+      });
+    }
+
+    if (!plan.isActive) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'This subscription plan is not available'
+      });
+    }
+
+    // Check if user already has an active subscription
+    const activeSubscription = await UserSubscription.findOne({
+      user: userId,
+      status: 'active'
+    });
+
+    if (activeSubscription) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'You already have an active subscription. Please cancel it first or wait for it to expire.'
+      });
+    }
+
+    // Create pending subscription
+    const startDate = new Date();
+    let endDate = new Date();
+    
+    if (billingCycle === 'monthly') {
+      endDate.setMonth(endDate.getMonth() + 1);
+    } else if (billingCycle === 'yearly') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    }
+
+    // Initialize Paystack payment
+    const metadata = {
+      userId,
+      planId,
+      planName: plan.name,
+      billingCycle,
+      amount: plan.amount,
+      autoRenew
+    };
+
+    const paymentInit = await paystackService.initializePayment(
+      user.email,
+      plan.amount,
+      metadata
+    );
+
+    // Create user subscription with pending status
+    const userSubscription = await UserSubscription.create({
+      user: userId,
+      plan: planId,
+      planName: plan.name,
+      amount: plan.amount,
+      currency: 'NGN',
+      billingCycle,
+      status: 'pending',
+      startDate,
+      endDate,
+      autoRenew,
+      paymentMethod: 'paystack',
+      paymentDetails: {
+        reference: paymentInit.reference,
+        accessCode: paymentInit.accessCode,
+        authorizationUrl: paymentInit.authorizationUrl
+      }
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Payment initialized successfully',
+      data: {
+        authorizationUrl: paymentInit.authorizationUrl,
+        reference: paymentInit.reference,
+        subscription: userSubscription
+      }
+    });
+  } catch (err) {
+    res.status(400).json({
+      status: 'fail',
+      message: err.message
+    });
+  }
+};
+
+// Verify Paystack payment
+exports.verifySubscriptionPayment = async (req, res) => {
+  try {
+    const { reference } = req.params;
+    const userId = req.user.id;
+
+    // Find subscription with this reference
+    const subscription = await UserSubscription.findOne({
+      'paymentDetails.reference': reference,
+      user: userId
+    });
+
+    if (!subscription) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'Subscription not found'
+      });
+    }
+
+    // Verify payment with Paystack
+    const paymentVerification = await paystackService.verifyPayment(reference);
+
+    if (paymentVerification.status === 'success') {
+      // Update subscription status to active
+      subscription.status = 'active';
+      subscription.paymentDetails.authorizationCode = paymentVerification.metadata?.authorization_code;
+      
+      // Add to payment history
+      subscription.paymentHistory.push({
+        amount: subscription.amount,
+        reference: reference,
+        status: 'success',
+        date: new Date()
+      });
+
+      await subscription.save();
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Payment verified successfully',
+        data: {
+          subscription
+        }
+      });
+    } else {
+      subscription.status = 'expired';
+      await subscription.save();
+
+      res.status(400).json({
+        status: 'fail',
+        message: 'Payment verification failed',
+        data: {
+          subscription
+        }
+      });
+    }
+  } catch (err) {
+    res.status(400).json({
+      status: 'fail',
+      message: err.message
+    });
+  }
+};
+
+// Paystack webhook (for payment callbacks)
+exports.paystackWebhook = async (req, res) => {
+  try {
+    const event = req.body;
+
+    // Verify webhook signature (implement security)
+    if (event.event === 'charge.success') {
+      const { reference, metadata, authorization } = event.data;
+      
+      // Find subscription with this reference
+      const subscription = await UserSubscription.findOne({
+        'paymentDetails.reference': reference
+      });
+
+      if (subscription) {
+        subscription.status = 'active';
+        subscription.paymentDetails.authorizationCode = authorization.authorization_code;
+        subscription.paymentDetails.cardType = authorization.card_type;
+        subscription.paymentDetails.last4 = authorization.last4;
+        subscription.paymentDetails.expMonth = authorization.exp_month;
+        subscription.paymentDetails.expYear = authorization.exp_year;
+        subscription.paymentDetails.bank = authorization.bank;
+        subscription.paymentDetails.accountName = authorization.account_name;
+
+        subscription.paymentHistory.push({
+          amount: subscription.amount,
+          reference: reference,
+          status: 'success',
+          date: new Date()
+        });
+
+        await subscription.save();
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Webhook error:', err);
+    res.sendStatus(500);
+  }
+};
+
+// Check if user has active subscription (for access control)
+exports.checkSubscriptionAccess = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const activeSubscription = await UserSubscription.findOne({
+      user: userId,
+      status: 'active'
+    });
+
+    if (!activeSubscription) {
+      return res.status(403).json({
+        status: 'fail',
+        message: 'You need an active subscription to access this content',
+        requiresSubscription: true
+      });
+    }
+
+    // Check if subscription is expired
+    if (new Date() > activeSubscription.endDate) {
+      activeSubscription.status = 'expired';
+      await activeSubscription.save();
+      
+      return res.status(403).json({
+        status: 'fail',
+        message: 'Your subscription has expired. Please renew to continue watching.',
+        requiresSubscription: true
+      });
+    }
+
+    // Attach subscription to request for use in other routes
+    req.subscription = activeSubscription;
+    next();
+  } catch (err) {
+    res.status(500).json({
+      status: 'fail',
+      message: err.message
+    });
+  }
+};
+
+// Get user's subscription status
+exports.getMySubscriptionStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const activeSubscription = await UserSubscription.findOne({
+      user: userId,
+      status: 'active'
+    }).populate('plan');
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        hasActiveSubscription: !!activeSubscription,
+        subscription: activeSubscription || null
+      }
+    });
+  } catch (err) {
+    res.status(404).json({
+      status: 'fail',
+      message: err.message
+    });
+  }
+};
+
+// Renew subscription (charge authorization)
+exports.renewSubscription = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { subscriptionId } = req.params;
+
+    const subscription = await UserSubscription.findOne({
+      _id: subscriptionId,
+      user: userId,
+      status: 'active'
+    }).populate('plan');
+
+    if (!subscription) {
+      return res.status(404).json({
+        status: 'fail',
+        message: 'Active subscription not found'
+      });
+    }
+
+    if (!subscription.autoRenew) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Auto-renew is disabled for this subscription'
+      });
+    }
+
+    if (!subscription.paymentDetails.authorizationCode) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'No payment authorization found. Please resubscribe.'
+      });
+    }
+
+    // Charge the saved authorization
+    const charge = await paystackService.chargeAuthorization(
+      subscription.paymentDetails.authorizationCode,
+      req.user.email,
+      subscription.amount,
+      {
+        userId,
+        subscriptionId: subscription._id,
+        planId: subscription.plan._id,
+        renewal: true
+      }
+    );
+
+    // Update subscription dates
+    const newEndDate = new Date();
+    if (subscription.billingCycle === 'monthly') {
+      newEndDate.setMonth(newEndDate.getMonth() + 1);
+    } else {
+      newEndDate.setFullYear(newEndDate.getFullYear() + 1);
+    }
+
+    subscription.startDate = new Date();
+    subscription.endDate = newEndDate;
+    
+    subscription.paymentHistory.push({
+      amount: subscription.amount,
+      reference: charge.reference,
+      status: 'success',
+      date: new Date()
+    });
+
+    await subscription.save();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Subscription renewed successfully',
+      data: {
+        subscription
       }
     });
   } catch (err) {

@@ -11,9 +11,16 @@ router.get('/', subscriptionController.getAllSubscriptions);
 // Get a single subscription plan
 router.get('/:id', subscriptionController.getSubscription);
 
+router.post('/paystack/webhook', subscriptionController.paystackWebhook);
+
 // ========== PROTECTED ROUTES (Authentication required) ==========
 // All routes below this line require authentication
 router.use(authController.protect);
+
+router.post('/initialize-payment', subscriptionController.initializeSubscriptionPayment);
+
+// Verify payment
+router.get('/verify-payment/:reference', subscriptionController.verifySubscriptionPayment);
 
 // ========== ADMIN-ONLY ROUTES ==========
 // All routes below this line require admin privileges

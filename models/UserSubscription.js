@@ -21,7 +21,7 @@ const userSubscriptionSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    default: 'USD'
+    default: 'NGN'
   },
   billingCycle: {
     type: String,
@@ -31,15 +31,14 @@ const userSubscriptionSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['active', 'cancelled', 'expired', 'pending'],
-    default: 'active'
+    default: 'pending'
   },
   startDate: {
     type: Date,
     default: Date.now
   },
   endDate: {
-    type: Date,
-    required: true
+    type: Date
   },
   cancelledAt: {
     type: Date
@@ -50,12 +49,29 @@ const userSubscriptionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['credit_card', 'paypal', 'apple_pay', 'google_pay', 'crypto'],
-    default: 'credit_card'
+    enum: ['paystack', 'credit_card', 'bank_transfer'],
+    default: 'paystack'
   },
-  paymentId: {
-    type: String
+  paymentDetails: {
+    reference: { type: String },
+    accessCode: { type: String },
+    authorizationUrl: { type: String },
+    authorizationCode: { type: String },
+    cardType: { type: String },
+    last4: { type: String },
+    expMonth: { type: String },
+    expYear: { type: String },
+    bank: { type: String },
+    accountName: { type: String }
   },
+  paymentHistory: [
+    {
+      amount: { type: Number },
+      reference: { type: String },
+      status: { type: String },
+      date: { type: Date, default: Date.now }
+    }
+  ],
   createdAt: {
     type: Date,
     default: Date.now
@@ -75,5 +91,6 @@ userSubscriptionSchema.pre('save', function(next) {
 // Index for faster queries
 userSubscriptionSchema.index({ user: 1, status: 1 });
 userSubscriptionSchema.index({ endDate: 1 });
+userSubscriptionSchema.index({ 'paymentDetails.reference': 1 });
 
 module.exports = mongoose.model('UserSubscription', userSubscriptionSchema);
